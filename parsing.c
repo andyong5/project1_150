@@ -9,7 +9,7 @@ struct cLine parse(char* str){
   int numEle = 0;
   bool wasEnd = true;
   int curStrLen = 0;
-  for(int i = 0; i < strlen(str); i++) {
+  for(int i = 0; i < (int)strlen(str); i++) {
     if (wasEnd && (str[i] == '|' || str[i] == '>')){
       wasEnd = false;
       numEle++;
