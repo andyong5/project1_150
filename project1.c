@@ -96,52 +96,123 @@ void pipe_cmd()
 	pipes[2].args[1] = "apple";
 	pipes[2].args[2] = NULL;
 
+	// pipes[3].cmd = "grep";
+	// pipes[3].args[0] = pipes[3].cmd;
+	// pipes[3].args[1] = "apple";
+	// pipes[3].args[2] = NULL;
+
 	int pipe_size = (int)(sizeof(pipes) / sizeof(pipes[0]));
 	int fd[2];
-	int fd2[2];
-	printf("%d pipe size\n", pipe_size);
-	pipe(fd);
-	for (int i = 0; i < (int)pipe_size; i++) {
-		if(i %2 == 1 && i + 1 < (int)pipe_size) {
-			int old = fd[0];
-			printf("old = %d\n", old);
-			pipe(fd);
-			printf("fd[0] = %d after\n", fd[0]);
-			printf("fd[1] = %d after\n", fd[1]);
-			fd[0] = old;
-		}
-		pid_t pid;
-		pid = fork();
-		if (pid == 0)
-		{
-			if (i % 2 == 0)
-			{
-				printf("fd[0] = %d\n", fd[0]);
-				printf("fd[1] = %d\n", fd[1]);
-				close(fd[0]);
-				dup2(fd[1], STDOUT_FILENO);
-				close(fd[1]);
-				execvp(pipes[i].cmd, pipes[i].args);
-			}
-			else
-			{
-				printf("fd[0] = %d\n", fd[0]);
-				printf("fd[1] = %d\n", fd[1]);
-				close(fd[1]);
-				dup2(fd[0], STDIN_FILENO);
-				close(fd[0]);
-				execvp(pipes[i].cmd, pipes[i].args);
-			}
-		}
-		else if (pid > 0)
-		{
-			int status;
-			waitpid(pid, &status, 0);
-			printf("fd2[0] = %d\n", fd[0]);
-			printf("fd2[1] = %d\n", fd[1]);
-			// fprintf(stdout, "+ completed [%d]\n", status);
-		}
-	}
+	int old[2];
+	int first = false;
+	bool lastOne = false;
+
+	//This was just to try to get 3 pipes without using a loop
+	// pid_t pid;
+	// pid = fork();
+	// if (pid == 0) {
+	// 	pipe(fd);
+	// 	if(fork() != 0){
+	// 		close(fd[0]);
+	// 		dup2(fd[1], STDOUT_FILENO);
+	// 		close(fd[1]);
+
+	// 		close(fd2[0]);
+	// 		close(fd2[1]);
+	// 		execvp(pipes[0].cmd, pipes[0].args);
+	// 	} else{
+	// 		close(fd[1]);
+	// 		dup2(fd[0], STDIN_FILENO);
+	// 		close(fd[0]);
+			
+	// 		printf("fd[0] = %d after\n", fd[0]);
+	// 		printf("fd[1] = %d after\n", fd[1]);
+			
+	// 		printf("old[0] = %d after\n", fd2[0]);
+	// 		printf("old[1] = %d after\n", fd2[1]);
+	// 		close(fd2[0]);
+	// 		dup2(fd2[1], STDOUT_FILENO);
+	// 		close(fd2[1]);
+	// 		execvp(pipes[1].cmd, pipes[1].args);
+	// 	}
+	// }
+	// else if (pid > 0) {
+	// 	int status;
+	// 	waitpid(pid, &status, 0);
+	// 	printf("got here\n");
+	// 	close(fd2[1]);
+	// 	dup2(fd2[0], STDIN_FILENO);
+	// 	close(fd2[0]);
+	// 	execvp(pipes[2].cmd, pipes[2].args);
+	// 	fprintf(stdout, "+ completed [%d]\n", status);
+	// }
+
+	for (int i = 0; i < pipe_size; i++) {
+        if(i + 1 == pipe_size)
+            lastOne = true; 
+        if(i +1 <= pipe_size && i != 0 && lastOne != true) {
+            old[0] = fd[0];
+            old[1] = fd[1];
+            pipe(fd);
+            printf("fd[0] = %d after\n", fd[0]);
+            printf("fd[1] = %d after\n", fd[1]);
+            printf("old[0] = %d after\n", old[0]);
+            printf("old[1] = %d after\n", old[1]);
+        }
+        pid_t pid;
+        pid = fork();
+        if (pid == 0) {
+            if(first){
+                close(fd[0]);
+                dup2(fd[1], STDOUT_FILENO);
+                close(fd[1]);
+                execvp(pipes[i].cmd, pipes[i].args);
+            } else {
+                if(lastOne){
+                    close(old[0]);
+                    close(old[1]);
+                    
+                    close(fd[1]);
+                    dup2(fd[0], STDIN_FILENO);
+                    close(fd[0]);
+
+                    execvp(pipes[i].cmd, pipes[i].args);
+                } else{
+                    close(old[1]);
+                    dup2(old[0], STDIN_FILENO);
+                    close(old[0]);
+
+                    close(fd[0]);
+                    dup2(fd[1], STDOUT_FILENO);
+                    close(fd[1]);
+                    execvp(pipes[i].cmd, pipes[i].args);
+                }
+            }
+        } else{
+            if(i == 0)
+                first = false;
+            int status;
+            waitpid(pid, &status, 0);
+            // printf("got here\n");
+            // fprintf(stdout, "+ completed [%d]\n", status);
+        }
+    }
+
+
+	
+	// for (int i = 0; i < pipe_size; i+=2) {
+	// 	pipe(fd);
+	// 	pid_t pid;
+	// 	pid = fork();
+	// 	if (pid == 0) {
+
+	// 	}
+	// 	else if (pid > 0) {
+	// 		int status;
+	// 		waitpid(pid, &status, 0);
+	// 		fprintf(stdout, "+ completed [%d]\n", status);
+	// 	}
+	// }
 }
 
 int main(void)
@@ -182,34 +253,28 @@ int main(void)
 		struct cLine cline_struct = parse(cmd);
 		struct command *cmd_struct = parse_cmd(cline_struct, 0);
 		char *test[] = {cmd_struct->cmd, NULL};
-		// char *test2[] = {cmd_struct->cmd, "test",NULL};
-		// char *cmd_remove = deblank(cmd_struct->args);
-		// printf("%s\n", cmd_struct->args);
-		if (strcmp(cmd_struct->cmd, "cd") == 0)
-		{
+		char *test2[] = {cmd_struct->cmd, "test",NULL};
+		char *cmd_remove = deblank(cmd_struct->args);
+		if (strcmp(cmd_struct->cmd, "cd") == 0){
 			cd(cmd, cmd_struct);
 		}
-		else if (cmd_struct->isRedirected)
-		{
+		else if (cmd_struct->isRedirected) {
 			redirect(cmd, cmd_struct);
 		}
-		else if (cmd_struct->isPiped)
-		{
-			pid_t pid;
-			pid = fork();
-			if (pid == 0)
-			{
-				pipe_cmd();
-			}
-			else if (pid > 0)
-			{
-				int status;
-				waitpid(pid, &status, 0);
-				fprintf(stdout, "+ completed '%s' [%d]\n", cmd, status);
-			}
-		}
-		else
-		{
+		else if (cmd_struct->isPiped) {
+			pipe_cmd();
+			// pid_t pid;
+			// pid = fork();
+			// if (pid == 0) {
+			// 	pipe_cmd();
+			// }
+			// else if (pid > 0)
+			// {
+			// 	int status;
+			// 	waitpid(pid, &status, 0);
+			// 	// fprintf(stdout, "+ completed '%s' [%d]\n", cmd, status);
+			// }
+		} else {
 			pid_t pid;
 			pid = fork();
 			if (pid == 0)
