@@ -11,42 +11,49 @@
 #define CMDLINE_MAX 512
 
 void cd(char *full_cmd, struct command *cmd_struct) {
+
+	if(cmd_struct->args[1] == NULL){
+		fprintf(stderr, "Error: cannot cd into directory\n");
+		fprintf(stderr, "+ completed '%s' [%d]\n", full_cmd, 1);
+		return;
+	} 
 	if (strcmp(cmd_struct->args[1], "..") == 0) {
 		chdir("..");
 		fprintf(stderr, "+ completed '%s' [%d]\n", full_cmd, 0);
-	} else {
+	} 
+	else {
 		if (chdir(cmd_struct->args[1]) == 0) {
 			fprintf(stderr, "+ completed '%s' [%d]\n", full_cmd, 0);
-		} else {
-			fprintf(stderr, "Error: no such directory\n");
+		} 
+		else {
+			fprintf(stderr, "Error: cannot cd into directory\n");
 			fprintf(stderr, "+ completed '%s' [%d]\n", full_cmd, 1);
 		}
 	}
 }
 
 void redirect(char *full_cmd, struct command *cmd_struct) {
+	
+	if(strcmp(cmd_struct->file,"") == 0){
+		fprintf(stderr, "Error: no output file\n");
+	}
 	pid_t pid;
 	pid = fork();
 	int fd;
 	if (pid == 0) {
-		if(strcmp(cmd_struct->file,"") == 0){
-			fprintf(stderr, "Error: no output file\n");
-			exit(1);
-		}
 		fd = open(cmd_struct->file, O_RDWR | O_CREAT | O_TRUNC, 0644);
 		if(fd == -1){
-			fprintf(stderr, "Error: cannot open ouput file\n");
+			fprintf(stderr, "Error: cannot open output file\n");
 			exit(1);
-		} else {
+		} 
+		else {
 			dup2(fd, STDOUT_FILENO);
 			close(fd);
 
 			execvp(cmd_struct->cmd, cmd_struct->args);
-			// perror("execvp");
-			exit(1);
 		}
-	}
-	else if (pid > 0){
+	} 
+	else if (pid > 0) {
 		int status;
 		waitpid(pid, &status, 0);
 		int error = WEXITSTATUS(status);
@@ -56,6 +63,7 @@ void redirect(char *full_cmd, struct command *cmd_struct) {
 }
 
 void print_error(int status[], int size, char* full_cmd){
+
 	fprintf(stderr, "+ completed '%s' ", full_cmd);
 	for(int i = 0; i < size; i++){
 		fprintf(stderr, "[%d]", status[i]);
@@ -72,7 +80,6 @@ void pipe_cmd(char* full_cmd, struct command* cmd_struct) {
 
 	pid_t pi_d;
 	pid_t pid;
-	
 	struct command* cur_cmd = cmd_struct;
 	pipe(old);
 	for(int i = 0; i < pipe_size; i+=2) { //https://stackoverflow.com/questions/6542491/how-to-create-two-processes-from-a-single-parent
@@ -167,6 +174,7 @@ void pipe_cmd(char* full_cmd, struct command* cmd_struct) {
 }
 
 int main(void) {
+	
 	char cmd[CMDLINE_MAX];
 	char** sets = malloc(sizeof(char*)*26);
 	for( unsigned int i = 0; i <= 26; i++) {
@@ -211,59 +219,54 @@ int main(void) {
 			
 		if (cmd_struct->error) {
 			fprintf(stderr, "%s\n", cmd_struct->cmd);
-			// free(cmd_struct);
-		} else if (strcmp(cmd_struct->cmd, "cd") == 0) {
-		
+		} 
+		else if (strcmp(cmd_struct->cmd, "cd") == 0) {
 			cd(cmd, cmd_struct);
-		} else if (cmd_struct->isRedirected) {
-			
+		} 
+		else if (cmd_struct->isRedirected) {
 			redirect(cmd, cmd_struct);
-		} else if (cmd_struct->isPiped){
-
+		} 
+		else if (cmd_struct->isPiped){
 			pipe_cmd(cmd, cmd_struct);
-		} else if (strcmp(cmd_struct->cmd, "set") == 0) {	
+		} 
+		else if (strcmp(cmd_struct->cmd, "set") == 0) {	
 			if(cmd_struct->args[1] == NULL || strlen(cmd_struct->args[1]) != 1 || cmd_struct->args[1][0] < 'a' || cmd_struct->args[1][0] > 'z') {
-				fprintf(stderr, "Error: invalid varible name\n");
+				fprintf(stderr, "Error: invalid variable name\n");
 				fprintf(stderr, "+ completed '%s' [%d]\n", cmd, 1);
-			}
-			else{
+			} else {
 				int index = (int)(cmd_struct->args[1][0]) - 'a';
-				if (strcmp(sets[index], "") == 0) {
+				if (strcmp(sets[index], "") == 0)
 					sets[index] = malloc(sizeof(char)*strlen(cmd_struct->args[2]));
-				}
-				else {
+				else 
 					sets[index] = realloc(sets[index],sizeof(char)*strlen(cmd_struct->args[2]));
-				}
+				
 				strcpy(sets[index], cmd_struct->args[2]);
 				fprintf(stderr, "+ completed '%s' [%d]\n", cmd, 0);
 			}
 
-		}	else {
+		} 
+		else {
 			pid_t pid;
 			pid = fork();
-			if (pid == 0)
-			{
+			if (pid == 0) {
 				if (strcmp(cmd_struct->cmd, "pwd") == 0) {
 					char *arr[] = {cmd_struct->cmd, NULL};
 					execvp(cmd_struct->cmd, arr);
-				}
+				} 
 				else {
 					execvp(cmd_struct->cmd, cmd_struct->args);
 					exit(1);
 				}
 			}
-			else if (pid > 0)
-			{
+			else if (pid > 0) {
 				int status;
 				waitpid(pid, &status, 0);
 				int error = WEXITSTATUS(status);
-				if(error == 1){
+				if(error == 1)
 					fprintf(stderr, "Error: command not found\n");
-				}
 				fprintf(stderr, "+ completed '%s' [%d]\n", cmd, error);
 			}
 		}
 	}
-
 	return EXIT_SUCCESS;
 }

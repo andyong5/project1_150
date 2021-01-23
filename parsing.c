@@ -20,6 +20,7 @@ struct cLine parse(char* str){
 			retVal[numEle - 1][1] = '\0';
 			curStrLen++;
 		} else if (!wasEnd && (str[i] == '|' || str[i] == '>')) {
+			wasEnd = true;
 			retVal[numEle - 1] = realloc(retVal[numEle - 1], (curStrLen + 1) * sizeof(char));
 			retVal[numEle - 1][curStrLen] = '\0';
 			curStrLen = 0;
@@ -28,7 +29,6 @@ struct cLine parse(char* str){
 			retVal[numEle - 1] = malloc(sizeof(char)*2);
 			retVal[numEle - 1][0] = str[i];
 			retVal[numEle - 1][1] = '\0';
-			numEle++;
 		} else if(wasEnd && str[i] == ' '){
 			continue;
 		} else if(wasEnd && str[i] != ' '){
