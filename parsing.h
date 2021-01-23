@@ -19,6 +19,4 @@
 	struct cLine parse(char* str);
 	struct command* parse_cmd(struct cLine args, int start, char** sets);
 	int countPipes(struct command* cmd);
-	//void free_cmd(struct command* cmd);
-
 #endif
