@@ -9,6 +9,7 @@ struct cLine parse(char* str){
 	int numEle = 0;
 	bool wasEnd = true;
 	int curStrLen = 0;
+	
 	for(unsigned int i = 0; i < strlen(str); i++) {
 		if (wasEnd && (str[i] == '|' || str[i] == '>')){
 			wasEnd = false;
@@ -46,26 +47,25 @@ struct cLine parse(char* str){
 			retVal[numEle - 1] = realloc(retVal[numEle - 1], (curStrLen + 1) * sizeof(char));
 			retVal[numEle - 1][curStrLen] = '\0';
 			curStrLen = 0;
-		} else {
 		}
 	}
 	struct cLine ret;
 	ret.tokens = retVal;
 	ret.size = numEle;
-
 	return ret;
 }
 
 struct command* parse_cmd(struct cLine args, int start, char** sets){
-   
+	if(start == args.size)
+		return NULL;
 	if(strcmp(args.tokens[start], ">") == 0 || strcmp(args.tokens[start], "|") == 0) {
 		struct command* error = malloc(sizeof(struct command));
 		error->cmd = "Error: missing command";
 		error->error = true;
-		for(int i = 0; i < args.size; i++ ) {
-			free(args.tokens[i]);
-		}
-		free(args.tokens);
+		// for(int i = 0; i < args.size; i++ ) {
+		// 	free(args.tokens[i]);
+		// }
+		// free(args.tokens);
 		return error;
 	}
 
@@ -73,10 +73,10 @@ struct command* parse_cmd(struct cLine args, int start, char** sets){
 		struct command* error = malloc(sizeof(struct command));
 		error->cmd = "Error: too many process arguments";
 		error->error = true;
-		for(int i = 0; i < args.size; i++ ) {
-			free(args.tokens[i]);
-		}
-		free(args.tokens);
+		// for(int i = 0; i < args.size; i++ ) {
+		// 	free(args.tokens[i]);
+		// }
+		// free(args.tokens);
 		return error;
 	}
 
@@ -93,17 +93,17 @@ struct command* parse_cmd(struct cLine args, int start, char** sets){
 			struct command* error = malloc(sizeof(struct command));
 			error->cmd = "Error: invalid variable name";
 			error->error = true;
-			for(int i = 0; i < args.size; i++ ) {
-				free(args.tokens[i]);
-			}
-			free(args.tokens);
+			// for(int i = 0; i < args.size; i++ ) {
+			// 	free(args.tokens[i]);
+			// }
+			// free(args.tokens);
 			return error;
 		}
 		int index = (int)(args.tokens[start][1] - 'a');
 		arg[0] = malloc(sizeof(char)* strlen(args.tokens[start]));
 		strcpy(arg[0], sets[index]);
 		strcpy(cmd, sets[index]);
-		free(args.tokens[start]);
+		// free(args.tokens[start]);
 		
 	} else {
 		strcpy(cmd, args.tokens[start]);
@@ -112,14 +112,23 @@ struct command* parse_cmd(struct cLine args, int start, char** sets){
 
 	for (int i =  start + 1; i < args.size; i++) {
 		if (args.tokens[i][0] == '$') {
-			/*if(strlen(args.tokens[start]) > 2 || args.tokens[start][1] > 'z' || args.tokens[start][1] < 'a') {
-				throw some error
-			}*/
+			if(strlen(args.tokens[i]) != 2 || args.tokens[i][1] > 'z' || args.tokens[i][1] < 'a') {
+				struct command* error = malloc(sizeof(struct command));
+				error->cmd = "Error: invalid variable name";
+				error->error = true;
+
+				// for(int i = 0; i < args.size; i++ ) {
+				// 	free(args.tokens[i]);
+				// }
+
+				// free(args.tokens);
+				return error;
+			}
 
 			int index = (int)(args.tokens[i][1] - 'a');
 			arg[argc] = malloc(sizeof(char)* strlen(args.tokens[i]));			
 			strcpy(arg[argc], sets[index]);
-			free(args.tokens[i]);
+			// free(args.tokens[i]);
 			argc++;
 			
 		} else if(strcmp(args.tokens[i], ">") == 0) {
@@ -127,17 +136,48 @@ struct command* parse_cmd(struct cLine args, int start, char** sets){
 			if(i + 1 < args.size ) {
 				strcpy(file, args.tokens[i + 1]);
 				i++;
-			} /*else {
-				trow some error
-			}*/
+			} else {
+				struct command* error = malloc(sizeof(struct command));
+				error->cmd = "Error: no output file";
+				error->error = true;
+				// for(int i = 0; i < args.size; i++ ) {
+				// 	free(args.tokens[i]);
+				// }
+
+				// free(args.tokens);
+				return error;
+			}
 		} else if (strcmp(args.tokens[i], "|") == 0) {
 			isPiped = true;
-			if(i + 1 < args.size ) {
+			if(isRedirected) {
+				struct command* error = malloc(sizeof(struct command));
+				error->cmd = "Error: mislocated output redirection";
+				error->error = true;
+
+				// for(int i = 0; i < args.size; i++ ) {
+				// 	free(args.tokens[i]);
+				// }
+
+				// free(args.tokens);
+				return error;
+			} else if(i + 1 < args.size ) {
 				next = parse_cmd(args, i + 1, sets);
+				if(next->error) {
+					return next;
+				}
 				break;
-			} /*else {
-				trow some error
-			}*/
+			} else {
+				struct command* error = malloc(sizeof(struct command));
+				error->cmd = "Error: missing command";
+				error->error = true;
+
+				// for(int i = 0; i < args.size; i++ ) {
+				// 	free(args.tokens[i]);
+				// }
+
+				// free(args.tokens);
+				return error;
+			}
 		} else {
 			arg[argc] = args.tokens[i];
 			argc++;
@@ -154,8 +194,8 @@ struct command* parse_cmd(struct cLine args, int start, char** sets){
 		strcpy(c1->file, file);
 	}
 	arg[argc + 1] = NULL;
-	//arg = realloc(arg, sizeof(char*) * (argc + 1));
 	c1->args = arg;
+	c1->error = false;
 
     return (c1);
 }
@@ -171,27 +211,3 @@ int countPipes(struct command* cmd) {
 
 	return count;
 }
-
-/*
-void free_cmd( struct command* cmd) {
-
-	if(cmd->isPiped) {
-		free_cmd(cmd->next);
-	}
-
-	if(cmd->isRedirected) {
-		free(cmd->file);
-	}
-
-	int i = 0;
-	while(cmd->args[i] != NULL) {
-		free(cmd->args[i]);
-		i++;
-	}
-
-	free(cmd->cmd);
-	free(cmd->args);
-	free(cmd);
-
-}*/
-

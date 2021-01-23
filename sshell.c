@@ -31,12 +31,12 @@ void redirect(char *full_cmd, struct command *cmd_struct) {
 	if (pid == 0) {
 		if(strcmp(cmd_struct->file,"") == 0){
 			fprintf(stderr, "Error: no output file\n");
-			return;
+			exit(1);
 		}
 		fd = open(cmd_struct->file, O_RDWR | O_CREAT | O_TRUNC, 0644);
 		if(fd == -1){
 			fprintf(stderr, "Error: cannot open ouput file\n");
-			return;
+			exit(1);
 		} else {
 			dup2(fd, STDOUT_FILENO);
 			close(fd);
@@ -50,7 +50,8 @@ void redirect(char *full_cmd, struct command *cmd_struct) {
 		int status;
 		waitpid(pid, &status, 0);
 		int error = WEXITSTATUS(status);
-		fprintf(stderr, "+ completed '%s' [%d]\n", full_cmd, error);
+		if(error != 1)
+			fprintf(stderr, "+ completed '%s' [%d]\n", full_cmd, error);
 	}
 }
 
@@ -90,6 +91,7 @@ void pipe_cmd(char* full_cmd, struct command* cmd_struct) {
 				close(fd[1]);
 				dup2(fd[0], STDIN_FILENO);
 				close(fd[0]);
+			
 				execvp(cur_cmd->cmd, cur_cmd->args);
 			}
 		}
@@ -164,17 +166,14 @@ void pipe_cmd(char* full_cmd, struct command* cmd_struct) {
 	}
 }
 
-int main(void)
-{
+int main(void) {
 	char cmd[CMDLINE_MAX];
 	char** sets = malloc(sizeof(char*)*26);
 	for( unsigned int i = 0; i <= 26; i++) {
 		sets[i] = "";
 	}
-	while (1)
-	{
+	while (1) {
 		char *nl;
-
 		/* Print prompt */
 		printf("sshell$ ");
 		fflush(stdout);
@@ -183,8 +182,7 @@ int main(void)
 		fgets(cmd, CMDLINE_MAX, stdin);
 
 		/* Print command line if stdin is not provided by terminal */
-		if (!isatty(STDIN_FILENO))
-		{
+		if (!isatty(STDIN_FILENO)) {
 			printf("%s", cmd);
 			fflush(stdout);
 		}
@@ -195,61 +193,62 @@ int main(void)
 			*nl = '\0';
 
 		/* Builtin command */
-		if (!strcmp(cmd, "exit"))
-		{
+		if (!strcmp(cmd, "exit")) {
 			fprintf(stderr, "Bye...\n");
 			fprintf(stderr, "+ completed 'exit' [0]\n");
 			break;
 		}
 		/* Regular command */
+		if(strcmp("", cmd) == 0){
+			continue;
+		}
 
 		struct command *cmd_struct = parse_cmd(parse(cmd), 0, sets);
-		
+
+		if(cmd_struct == NULL){
+			continue;
+		}
+			
 		if (cmd_struct->error) {
 			fprintf(stderr, "%s\n", cmd_struct->cmd);
-			free(cmd_struct);
-		}
-		else if (strcmp(cmd_struct->cmd, "cd") == 0)
-		{
+			// free(cmd_struct);
+		} else if (strcmp(cmd_struct->cmd, "cd") == 0) {
+		
 			cd(cmd, cmd_struct);
-		}
-		else if (cmd_struct->isRedirected)
-		{
+		} else if (cmd_struct->isRedirected) {
+			
 			redirect(cmd, cmd_struct);
-		}
-		else if (cmd_struct->isPiped)
-		{
+		} else if (cmd_struct->isPiped){
+
 			pipe_cmd(cmd, cmd_struct);
-		}
-		else if (strcmp(cmd_struct->cmd, "set") == 0) 
-		{
-			/*if(strlen(cmd_struct->args[1] != 1) || cmd_struct->args[1] < 'a' || cmd_struct->args[1] > 'z') {
-				throw some error
-			}*/
-			int index = (int)(cmd_struct->args[1][0]) - 'a';
-			if (strcmp(sets[index], "") == 0) {
-				sets[index] = malloc(sizeof(char)*strlen(cmd_struct->args[2]));
+		} else if (strcmp(cmd_struct->cmd, "set") == 0) {	
+			if(cmd_struct->args[1] == NULL || strlen(cmd_struct->args[1]) != 1 || cmd_struct->args[1][0] < 'a' || cmd_struct->args[1][0] > 'z') {
+				fprintf(stderr, "Error: invalid varible name\n");
+				fprintf(stderr, "+ completed '%s' [%d]\n", cmd, 1);
 			}
-			else {
-				sets[index] = realloc(sets[index],sizeof(char)*strlen(cmd_struct->args[2]));
+			else{
+				int index = (int)(cmd_struct->args[1][0]) - 'a';
+				if (strcmp(sets[index], "") == 0) {
+					sets[index] = malloc(sizeof(char)*strlen(cmd_struct->args[2]));
+				}
+				else {
+					sets[index] = realloc(sets[index],sizeof(char)*strlen(cmd_struct->args[2]));
+				}
+				strcpy(sets[index], cmd_struct->args[2]);
+				fprintf(stderr, "+ completed '%s' [%d]\n", cmd, 0);
 			}
 
-			strcpy(sets[index], cmd_struct->args[2]);
-			 
-		}		
-		else {
+		}	else {
 			pid_t pid;
 			pid = fork();
 			if (pid == 0)
 			{
-				if (strcmp(cmd_struct->cmd, "pwd") == 0)
-				{
-					execvp(cmd_struct->cmd, cmd_struct->args);
+				if (strcmp(cmd_struct->cmd, "pwd") == 0) {
+					char *arr[] = {cmd_struct->cmd, NULL};
+					execvp(cmd_struct->cmd, arr);
 				}
-				else
-				{
+				else {
 					execvp(cmd_struct->cmd, cmd_struct->args);
-					// perror("execvp");
 					exit(1);
 				}
 			}
@@ -258,6 +257,9 @@ int main(void)
 				int status;
 				waitpid(pid, &status, 0);
 				int error = WEXITSTATUS(status);
+				if(error == 1){
+					fprintf(stderr, "Error: command not found\n");
+				}
 				fprintf(stderr, "+ completed '%s' [%d]\n", cmd, error);
 			}
 		}
