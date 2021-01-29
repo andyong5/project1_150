@@ -77,13 +77,17 @@ void pipe_cmd(char* full_cmd, struct command* cmd_struct) {
 	int fd[2];
 	int old[2];
 	bool last_cmd = false;
-
+	
+	printf("%d\n", pipe_size);
 	pid_t pi_d;
 	pid_t pid;
 	struct command* cur_cmd = cmd_struct;
 	pipe(old);
+	bool re = false;
 	for(int i = 0; i < pipe_size; i+=2) { //https://stackoverflow.com/questions/6542491/how-to-create-two-processes-from-a-single-parent
 		if(i == pipe_size -1){ //for odd number of pipes
+			if(cmd_struct->isRedirected)
+				re = true;
 			pid_t pi_d2 = fork();
 			if(pi_d2 != 0 ){
 				close(fd[0]);
@@ -98,8 +102,12 @@ void pipe_cmd(char* full_cmd, struct command* cmd_struct) {
 				close(fd[1]);
 				dup2(fd[0], STDIN_FILENO);
 				close(fd[0]);
-			
-				execvp(cur_cmd->cmd, cur_cmd->args);
+				if(re) {
+					redirect(cur_cmd->cmd, cur_cmd);
+				} else{
+					execvp(cur_cmd->cmd, cur_cmd->args);
+				}
+				
 			}
 		}
 		if(i + 2 == pipe_size)
